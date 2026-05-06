@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os, re, sys, csv, glob, subprocess, datetime
+import os, re, csv, glob, datetime
 from collections import defaultdict
 import warnings
 warnings.filterwarnings('ignore')
@@ -98,28 +98,16 @@ def form_detay(at):
     return puan, ort, trend, varyans
 
 st.title("🐎 TJK Tahmin Pro v5")
-st.caption("Ganyan %45.9 | Plase %77.7 | Karanlık mod | Akıllı kupon | Tam güncelleme")
-
-# --- SIDEBAR: TAM GÜNCELLEME BUTONU ---
-if st.sidebar.button("🔄 Tam Güncelle (Yarış+AGF+İstatistik)"):
-    with st.spinner("⏳ Veriler güncelleniyor... (1-2 dk sürebilir)"):
-        try:
-            subprocess.run(["python","tjk_cekici.py"], capture_output=True, timeout=120)
-            subprocess.run(["python","gecmis_cekici.py"], capture_output=True, timeout=120)
-            subprocess.run(["python","istatistik_motoru.py"], capture_output=True, timeout=120)
-            st.success("✅ Tüm veriler güncellendi! Sayfa yenileniyor...")
-        except Exception as e:
-            st.error(f"Hata: {e}")
-    st.rerun()
+st.caption("Ganyan %45.9 | Plase %77.7 | Tam otomatik güncelleme")
 
 # Son güncelleme bilgisi
 if os.path.exists("gecmis_sonuclar.csv"):
     mod_time = os.path.getmtime("gecmis_sonuclar.csv")
     son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
-    st.sidebar.caption(f"📅 Son tam güncelleme: {son_tarih}")
+    st.info(f"📅 Son güncelleme: {son_tarih} (Her gece otomatik)")
 
 if df.empty:
-    st.warning("Yarış verisi yok. Lütfen 'Tam Güncelle' butonuna bas.")
+    st.warning("Henüz yarış verisi yok. Lütfen GitHub Actions'ı tetikleyin.")
     st.stop()
 
 hipodrom = st.selectbox("🏟️ Hipodrom", sorted(df["Hipodrom"].unique()))
