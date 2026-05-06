@@ -10,7 +10,7 @@ st.set_page_config(page_title="TJK Pro v5", page_icon="🐎", layout="wide")
 
 if "dark" not in st.session_state: st.session_state.dark = False
 if "auth" not in st.session_state: st.session_state.auth = False
-
+u
 if not st.session_state.auth:
     with st.form("login"):
         st.title("🐎 TJK Pro v5")
@@ -100,7 +100,6 @@ def form_detay(at):
 st.title("🐎 TJK Tahmin Pro v5")
 st.caption("Ganyan %45.9 | Plase %77.7 | Tam otomatik güncelleme")
 
-# Son güncelleme bilgisi
 if os.path.exists("gecmis_sonuclar.csv"):
     mod_time = os.path.getmtime("gecmis_sonuclar.csv")
     son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
@@ -111,17 +110,17 @@ if df.empty:
     st.stop()
 
 hipodrom = st.selectbox("🏟️ Hipodrom", sorted(df["Hipodrom"].unique()))
-kosular = sorted(df[df["Hipodrom"]==hipodrom]["Kosu_No"].unique(), key=int)
+kosular = sorted(df[df["Hipodrom"]==hipodrom]["Kosu_No"].unique(), key=lambda x: int(x) if str(x).isdigit() else 99)
 
 for k_no in kosular:
     k_df = df[(df["Hipodrom"]==hipodrom) & (df["Kosu_No"]==k_no)]
     if k_df.empty: continue
     row = k_df.iloc[0]
     with st.expander(f"🏁 {k_no}. Koşu | {row['Saat']} | {row['Mesafe']}m {row['Pist']} | {row['Cins']}"):
-        pist = row["Pist"]
-                pist_str = str(pist) if not pd.isna(pist) else ""
+        pist_str = str(row["Pist"]) if not pd.isna(row["Pist"]) else ""
         if "Cim" in pist_str or "Çim" in pist_str: st.caption("🌧️ Çim pist, yağmurda ağırlaşır.")
         elif "Kum" in pist_str: st.caption("🏜️ Kum pist, stabil.")
+
         puanlar = []
         for _, at in k_df.iterrows():
             p_agf = agf_puan(at.get("AGF",""))
@@ -140,7 +139,7 @@ for k_no in kosular:
             p_jokey = min(jokey_db.get(at["Jokey"],{}).get("kazanma",10)*5,100) if jokey_db.get(at["Jokey"],{}).get("toplam",0)>=5 else 50
             p_antr = min(antrenor_db.get(at["Antrenor"],{}).get("kazanma",10)*5,100) if antrenor_db.get(at["Antrenor"],{}).get("toplam",0)>=5 else 50
             p_at = min(at_db.get(at["At_Ismi"],{}).get("kazanma",10)*5,100) if at_db.get(at["At_Ismi"],{}).get("toplam",0)>=2 else 50
-            p_mesafe = (at_mesafe[at["At_Ismi"]][row["Mesafe"]]["ilk3"]/at_mesafe[at["At_Ismi"]][row["Mesafe"]]["toplam"]*100) if at_mesafe[at["At_Ismi"]][row["Mesafe"]]["toplam"]>=2 else 30
+            p_mesafe = (at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]["ilk3"]/at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]["toplam"]*100) if at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]["toplam"]>=2 else 30
             p_uyum = (jokey_at[(at["Jokey"],at["At_Ismi"])]["ilk3"]/jokey_at[(at["Jokey"],at["At_Ismi"])]["toplam"]*100) if (at["Jokey"],at["At_Ismi"]) in jokey_at and jokey_at[(at["Jokey"],at["At_Ismi"])]["toplam"]>=1 else 30
             
             toplam = (weights["AGF"]*p_agf + weights["G"]*p_g + weights["FORM"]*form_ort +
