@@ -119,9 +119,9 @@ for k_no in kosular:
     row = k_df.iloc[0]
     with st.expander(f"🏁 {k_no}. Koşu | {row['Saat']} | {row['Mesafe']}m {row['Pist']} | {row['Cins']}"):
         pist = row["Pist"]
-        if "Cim" in pist or "Çim" in pist: st.caption("🌧️ Çim pist, yağmurda ağırlaşır.")
-        elif "Kum" in pist: st.caption("🏜️ Kum pist, stabil.")
-
+                pist_str = str(pist) if not pd.isna(pist) else ""
+        if "Cim" in pist_str or "Çim" in pist_str: st.caption("🌧️ Çim pist, yağmurda ağırlaşır.")
+        elif "Kum" in pist_str: st.caption("🏜️ Kum pist, stabil.")
         puanlar = []
         for _, at in k_df.iterrows():
             p_agf = agf_puan(at.get("AGF",""))
