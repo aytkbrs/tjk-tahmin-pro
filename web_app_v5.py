@@ -8,11 +8,18 @@ warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="TJK Pro v5", page_icon="🐎", layout="wide")
 
+import streamlit as st
+import pandas as pd
+import numpy as np
+import os, re, csv, glob, datetime
+from collections import defaultdict
+import warnings
+warnings.filterwarnings('ignore')
+
+st.set_page_config(page_title="TJK Pro v5", page_icon="🐎", layout="wide")
+
 if "dark" not in st.session_state: st.session_state.dark = False
 if "auth" not in st.session_state: st.session_state.auth = False
-u
-if not st.session_state.auth:
-    with st.form("login"):
         st.title("🐎 TJK Pro v5")
         pwd = st.text_input("Şifre", type="password")
         if st.form_submit_button("Giriş"):
