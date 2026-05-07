@@ -157,26 +157,35 @@ for k_no in kosular:
             p_antr = min(antrenor_db.get(at["Antrenor"], {}).get("kazanma", 10) * 5, 100) if antrenor_db.get(at["Antrenor"], {}).get("toplam", 0) >= 5 else 50
             p_at = min(at_db.get(at["At_Ismi"], {}).get("kazanma", 10) * 5, 100) if at_db.get(at["At_Ismi"], {}).get("toplam", 0) >= 2 else 50
             p_mesafe = (at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]["ilk3"] / at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]["toplam"] * 100) if at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]["toplam"] >= 2 else 30
-            p_uyum = (jokey_at[(at["Jokey"], at["At_Ismi"])]["ilk3"] / jokey_at[(at["Jokey"], at["At_Ismi"])]["toplam"] * 100) if (at["Jokey"], at["At_Ismi"]) in jokey_at and jokey_at[(at["Jokey"], at["At_Ismi"])]["toplam"] >= 1 else 30
+            p_uyum = (jokey_at.get((at["Jokey"], at["At_Ismi"]), {}).get("ilk3", 0) /
+                      max(1, jokey_at.get((at["Jokey"], at["At_Ismi"]), {}).get("toplam", 1))) * 100
 
             toplam = (weights["AGF"] * p_agf + weights["G"] * p_g + weights["FORM"] * form_ort +
                       weights["TREND"] * p_trend + weights["GELIS"] * p_gelis + weights["VARYANS"] * p_var +
                       weights["JOKEY"] * p_jokey + weights["AT"] * p_at + weights["MESAFE"] * p_mesafe)
+
+            # --- YENİ SÜRPRİZ MANTIĞI (sadece güçlü sinyaller) ---
             agf_val = p(str(at.get("AGF","")).replace("%",""))
-son3_list = [g for _,g in at_form.get(at["At_Ismi"], [])[-3:]]
-son3_mukemmel = (len(son3_list)==3 and all(g<=3 for g in son3_list))
-jat_uyum = (jokey_at.get((at["Jokey"],at["At_Ismi"]), {}).get("ilk3",0) /
-            max(1, jokey_at.get((at["Jokey"],at["At_Ismi"]), {}).get("toplam",1))) * 100
-mesafe_basari = (at_mesafe.get(at["At_Ismi"], {}).get(str(row["Mesafe"]), {}).get("ilk3",0) /
-                 max(1, at_mesafe.get(at["At_Ismi"], {}).get(str(row["Mesafe"]), {}).get("toplam",1))) * 100
+            son3_list = [g for _,g in at_form.get(at["At_Ismi"], [])[-3:]]
+            son3_mukemmel = (len(son3_list)==3 and all(g<=3 for g in son3_list))
+            mesafe_basari = 0
+            if at["At_Ismi"] in at_mesafe and str(row["Mesafe"]) in at_mesafe[at["At_Ismi"]]:
+                m = at_mesafe[at["At_Ismi"]][str(row["Mesafe"])]
+                if m["toplam"] > 0:
+                    mesafe_basari = (m["ilk3"] / m["toplam"]) * 100
 
-surpriz = ""
-if (agf_val < 3 and son3_mukemmel) or (agf_val < 5 and jat_uyum >= 70) or (agf_val < 5 and mesafe_basari >= 50):
-    surpriz = "⚡"
+            surpriz = ""
+            if (agf_val < 3 and son3_mukemmel) or (agf_val < 5 and p_uyum >= 70) or (agf_val < 5 and mesafe_basari >= 50):
+                surpriz = "⚡"
 
-
-
-            puanlar.append({"Sıra": at["Sira"], "At": at["At_Ismi"], "Jokey": at["Jokey"], "Puan": round(toplam, 1), "Ganyan": at["Ganyan"], "Sürpriz": surpriz})
+            puanlar.append({
+                "Sıra": at["Sira"],
+                "At": at["At_Ismi"],
+                "Jokey": at["Jokey"],
+                "Puan": round(toplam, 1),
+                "Ganyan": at["Ganyan"],
+                "Sürpriz": surpriz
+            })
 
         puanlar.sort(key=lambda x: x["Puan"], reverse=True)
 
