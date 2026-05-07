@@ -18,7 +18,6 @@ jobs:
         with:
           python-version: '3.10'
       - run: pip install pandas numpy requests beautifulsoup4
-      - run: python tjk_cekici.py
       - run: python gecmis_cekici_ekle.py
       - run: python istatistik_motoru.py
       - name: Commit and push
