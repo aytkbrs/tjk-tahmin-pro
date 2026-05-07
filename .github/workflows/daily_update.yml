@@ -8,18 +8,26 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
       - run: pip install pandas numpy requests beautifulsoup4
       - run: python tjk_cekici.py
-      - run: python gecmis_cekici.py
+      - run: python gecmis_cekici_ekle.py
       - run: python istatistik_motoru.py
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add *.csv
+          git stash
+          git pull origin main --rebase
+          git stash pop || echo "No stash"
           git add *.csv
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update" && git push)
