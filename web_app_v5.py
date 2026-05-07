@@ -162,7 +162,20 @@ for k_no in kosular:
             toplam = (weights["AGF"] * p_agf + weights["G"] * p_g + weights["FORM"] * form_ort +
                       weights["TREND"] * p_trend + weights["GELIS"] * p_gelis + weights["VARYANS"] * p_var +
                       weights["JOKEY"] * p_jokey + weights["AT"] * p_at + weights["MESAFE"] * p_mesafe)
-            surpriz = "⚡" if p(str(at.get("AGF", "")).replace("%", "")) < 10 and ort <= 3 else ""
+            agf_val = p(str(at.get("AGF","")).replace("%",""))
+son3_list = [g for _,g in at_form.get(at["At_Ismi"], [])[-3:]]
+son3_mukemmel = (len(son3_list)==3 and all(g<=3 for g in son3_list))
+jat_uyum = (jokey_at.get((at["Jokey"],at["At_Ismi"]), {}).get("ilk3",0) /
+            max(1, jokey_at.get((at["Jokey"],at["At_Ismi"]), {}).get("toplam",1))) * 100
+mesafe_basari = (at_mesafe.get(at["At_Ismi"], {}).get(str(row["Mesafe"]), {}).get("ilk3",0) /
+                 max(1, at_mesafe.get(at["At_Ismi"], {}).get(str(row["Mesafe"]), {}).get("toplam",1))) * 100
+
+surpriz = ""
+if (agf_val < 3 and son3_mukemmel) or (agf_val < 5 and jat_uyum >= 70) or (agf_val < 5 and mesafe_basari >= 50):
+    surpriz = "⚡"
+
+
+
             puanlar.append({"Sıra": at["Sira"], "At": at["At_Ismi"], "Jokey": at["Jokey"], "Puan": round(toplam, 1), "Ganyan": at["Ganyan"], "Sürpriz": surpriz})
 
         puanlar.sort(key=lambda x: x["Puan"], reverse=True)
