@@ -1,0 +1,31 @@
+name: Weekly ML Model Training
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'   # Her Pazar saat 03:00 UTC (Türkiye saatiyle 06:00)
+  workflow_dispatch:      # Manuel çalıştırmaya da izin ver
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: pip install pandas numpy xgboost scikit-learn requests beautifulsoup4
+      - run: python ml_veri_hazirla_v3.py
+      - run: python ml_egitim_v4.py
+      - name: Commit and push new model
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ml_model.pkl ml_veri_v3.csv feature_importance_v3.csv
+          git stash
+          git pull origin main --rebase
+          git stash pop || echo "No stash"
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Weekly ML model update" && git push)
