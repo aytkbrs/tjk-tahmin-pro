@@ -138,7 +138,11 @@ if os.path.exists("gecmis_sonuclar.csv"):
     mod_time = os.path.getmtime("gecmis_sonuclar.csv")
     son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
     st.info(f"📅 Son güncelleme: {son_tarih}")
-
+if st.sidebar.button("🗑️ Cache Temizle & Yenile"):
+    st.cache_resource.clear()
+    st.cache_data.clear()
+    st.success("✅ Cache temizlendi, sayfa yenileniyor...")
+    st.rerun()
 if df.empty:
     st.warning("Henüz yarış verisi yok.")
     st.stop()
