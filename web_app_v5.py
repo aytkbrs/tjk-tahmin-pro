@@ -10,92 +10,22 @@ warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="TJK Pro Final", page_icon="🐎", layout="wide")
 
-# ---------- Karanlık mod ----------
-if "dark" not in st.session_state: st.session_state.dark = False
-if "auth" not in st.session_state: st.session_state.auth = False
-
-if not st.session_state.auth:
-    with st.form("login"):
-        st.title("🐎 TJK Pro Final")
-        pwd = st.text_input("Şifre", type="password")
-        if st.form_submit_button("Giriş"):
-            if pwd == "barisbaba2026":
-                st.session_state.auth = True
-                st.rerun()
-            else:
-                st.error("Yanlış şifre!")
-    st.stop()
-
-# ---------- SİDEBAR ----------
-with st.sidebar:
-    st.markdown("### ⚙️ Kontroller")
-    if st.button("🌙 Karanlık Mod" if not st.session_state.dark else "☀️ Aydınlık Mod"):
-        st.session_state.dark = not st.session_state.dark
-        st.rerun()
-    
-    st.markdown("---")
-    use_ml = st.checkbox("🤖 ML Destekli Hibrit Tahmin", value=True)
-    
-    st.markdown("---")
-    if st.button("🔄 Yarışları Canlı Çek"):
-        with st.spinner("⏳ TJK'dan güncel yarışlar alınıyor..."):
-            basarili, dosya = canli_yaris_cek()
-            if basarili:
-                st.success(f"✅ {dosya} oluşturuldu! Sayfa yenileniyor...")
-                st.cache_resource.clear()
-                st.cache_data.clear()
-                st.rerun()
-            else:
-                st.warning("⚠️ Bugün yarış bulunamadı veya bağlantı hatası.")
-    
-    if st.button("🗑️ Cache Temizle & Yenile"):
-        st.cache_resource.clear()
-        st.cache_data.clear()
-        st.success("✅ Cache temizlendi, sayfa yenileniyor...")
-        st.rerun()
-    
-    st.markdown("---")
-    if os.path.exists("gecmis_sonuclar.csv"):
-        mod_time = os.path.getmtime("gecmis_sonuclar.csv")
-        son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
-        st.caption(f"📅 Son güncelleme: {son_tarih}")
-    
-    st.markdown("---")
-    st.caption("👨‍👦 Aile içi kullanım")
-
-# ---------- CSS ----------
-if st.session_state.dark:
-    st.markdown("""<style>
-    body, .stApp {background:#1a1a2e;color:#eee}
-    .st-expander {background:#16213e;border-radius:12px;padding:8px;margin-bottom:8px;border:1px solid #0f3460}
-    .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 4px 8px rgba(0,0,0,0.3)}
-    .kupon-box {background:#2c3e50;border-radius:8px;padding:10px;margin:8px 0}
-    </style>""", unsafe_allow_html=True)
-else:
-    st.markdown("""<style>
-    .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 2px 6px rgba(0,0,0,0.15)}
-    .kupon-box {background:#f8f9fa;border-radius:8px;padding:10px;margin:8px 0;border:1px solid #dee2e6}
-    </style>""", unsafe_allow_html=True)
-
-# ---------- CANLI YARIŞ ÇEKME FONKSİYONU ----------
+# ---------- CANLI YARIŞ ÇEKME FONKSİYONU (EN ÜSTTE TANIMLANMALI) ----------
 def canli_yaris_cek():
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://www.tjk.org/TR/YarisSever/Info/Page/GunlukYarisProgrami"
     }
     bugun = datetime.datetime.now().strftime("%d/%m/%Y")
     tarih_dosya = datetime.datetime.now().strftime("%Y%m%d")
     csv_dosya = f"yarislar_{tarih_dosya}.csv"
-
     TURKIYE_SEHIRLER = ["Ankara", "Izmir", "İzmir", "Bursa", "Diyarbakir", "Diyarbakır",
                         "Istanbul", "İstanbul", "Adana", "Sanliurfa", "Şanlıurfa",
                         "Elazig", "Elazığ", "Antalya", "Kocaeli"]
-
     ana_url = "https://www.tjk.org/TR/YarisSever/Info/Page/GunlukYarisProgrami"
     response = requests.get(ana_url, headers=headers, timeout=15)
     soup = BeautifulSoup(response.text, "html.parser")
-
     sehirler = []
     gorulen = set()
     for link in soup.find_all("a", href=True):
@@ -114,7 +44,6 @@ def canli_yaris_cek():
             except: pass
     turkiye = [(sid, sad) for sid, sad in sehirler if any(t in sad for t in TURKIYE_SEHIRLER)]
     if not turkiye: return False, csv_dosya
-
     with open(csv_dosya, "w", encoding="utf-8-sig", newline="") as f:
         yazici = csv.writer(f, delimiter=";")
         yazici.writerow(["Hipodrom","Kosu_No","Saat","Mesafe","Pist","Cins","Sira","At_Ismi",
@@ -169,7 +98,6 @@ def canli_yaris_cek():
                             match_at = re.match(r"^([A-ZÇĞİÖŞÜ' ]+?)(?:\s+(?:KG|DB|KV|SK|SKG)|\s+\([^)]*\)|\s+[a-z]|$)", at_text)
                             at_ismi = match_at.group(1).strip() if match_at else at_text.split()[0]
                             if "(Koşmaz)" in at_text or "Kosmaz" in at_text: continue
-
                             td_yas = tr.find("td", class_="gunluk-GunlukYarisProgrami-Yas")
                             td_orijin = tr.find("td", class_="gunluk-GunlukYarisProgrami-Baba")
                             td_kilo = tr.find("td", class_="gunluk-GunlukYarisProgrami-Kilo")
@@ -183,7 +111,6 @@ def canli_yaris_cek():
                             td_s20 = tr.find("td", class_="gunluk-GunlukYarisProgrami-s20")
                             td_gny = tr.find("td", class_="gunluk-GunlukYarisProgrami-Gny")
                             td_agf = tr.find("td", class_="gunluk-GunlukYarisProgrami-AGFORAN")
-
                             yas = td_yas.get_text(strip=True) if td_yas else ""
                             orijin = td_orijin.get_text(strip=True) if td_orijin else ""
                             kilo = td_kilo.get_text(strip=True) if td_kilo else ""
@@ -205,7 +132,6 @@ def canli_yaris_cek():
                                 agf_text = td_agf.get_text(strip=True)
                                 agf_match = re.search(r'%(\d+(?:[,.]\d+)?)', agf_text)
                                 if agf_match: agf = "%" + agf_match.group(1)
-
                             yazici.writerow([sehir_adi, kosu_no, saat, mesafe, pist, cins,
                                              sira, at_ismi, yas, orijin, kilo,
                                              jokey, sahip, antrenor, start_no, hp,
@@ -213,6 +139,68 @@ def canli_yaris_cek():
                         except: pass
             except: pass
     return True, csv_dosya
+
+# ---------- Karanlık mod ----------
+if "dark" not in st.session_state: st.session_state.dark = False
+if "auth" not in st.session_state: st.session_state.auth = False
+
+if not st.session_state.auth:
+    with st.form("login"):
+        st.title("🐎 TJK Pro Final")
+        pwd = st.text_input("Şifre", type="password")
+        if st.form_submit_button("Giriş"):
+            if pwd == "barisbaba2026":
+                st.session_state.auth = True
+                st.rerun()
+            else:
+                st.error("Yanlış şifre!")
+    st.stop()
+
+# ---------- SİDEBAR ----------
+with st.sidebar:
+    st.markdown("### ⚙️ Kontroller")
+    if st.button("🌙 Karanlık Mod" if not st.session_state.dark else "☀️ Aydınlık Mod"):
+        st.session_state.dark = not st.session_state.dark
+        st.rerun()
+    st.markdown("---")
+    use_ml = st.checkbox("🤖 ML Destekli Hibrit Tahmin", value=True)
+    st.markdown("---")
+    if st.button("🔄 Yarışları Canlı Çek"):
+        with st.spinner("⏳ TJK'dan güncel yarışlar alınıyor..."):
+            basarili, dosya = canli_yaris_cek()
+            if basarili:
+                st.success(f"✅ {dosya} oluşturuldu! Sayfa yenileniyor...")
+                st.cache_resource.clear()
+                st.cache_data.clear()
+                st.rerun()
+            else:
+                st.warning("⚠️ Bugün yarış bulunamadı veya bağlantı hatası.")
+    if st.button("🗑️ Cache Temizle & Yenile"):
+        st.cache_resource.clear()
+        st.cache_data.clear()
+        st.success("✅ Cache temizlendi, sayfa yenileniyor...")
+        st.rerun()
+    st.markdown("---")
+    if os.path.exists("gecmis_sonuclar.csv"):
+        mod_time = os.path.getmtime("gecmis_sonuclar.csv")
+        son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
+        st.caption(f"📅 Son güncelleme: {son_tarih}")
+    st.markdown("---")
+    st.caption("👨‍👦 Aile içi kullanım")
+
+# ---------- CSS ----------
+if st.session_state.dark:
+    st.markdown("""<style>
+    body, .stApp {background:#1a1a2e;color:#eee}
+    .st-expander {background:#16213e;border-radius:12px;padding:8px;margin-bottom:8px;border:1px solid #0f3460}
+    .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 4px 8px rgba(0,0,0,0.3)}
+    .kupon-box {background:#2c3e50;border-radius:8px;padding:10px;margin:8px 0}
+    </style>""", unsafe_allow_html=True)
+else:
+    st.markdown("""<style>
+    .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 2px 6px rgba(0,0,0,0.15)}
+    .kupon-box {background:#f8f9fa;border-radius:8px;padding:10px;margin:8px 0;border:1px solid #dee2e6}
+    </style>""", unsafe_allow_html=True)
 
 # ---------- VERİ YÜKLEME ----------
 @st.cache_resource(ttl=3600)
