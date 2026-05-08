@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os, re, csv, glob, datetime, pickle
+import os, re, csv, glob, datetime, pickle, requests
+from bs4 import BeautifulSoup
 from collections import defaultdict
+from urllib.parse import unquote, quote
 import warnings
 warnings.filterwarnings('ignore')
 
-st.set_page_config(page_title="TJK Pro v11", page_icon="🐎", layout="wide")
+st.set_page_config(page_title="TJK Pro v12", page_icon="🐎", layout="wide")
 
 # ---------- Karanlık mod ----------
 if "dark" not in st.session_state: st.session_state.dark = False
@@ -14,7 +16,7 @@ if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
     with st.form("login"):
-        st.title("🐎 TJK Pro v11")
+        st.title("🐎 TJK Pro v12")
         pwd = st.text_input("Şifre", type="password")
         if st.form_submit_button("Giriş"):
             if pwd == "barisbaba2026":
@@ -29,14 +31,151 @@ with c1:
     if st.button("🌙" if not st.session_state.dark else "☀️"):
         st.session_state.dark = not st.session_state.dark
 
-# CSS – temiz görünüm
+# CSS
 if st.session_state.dark:
     st.markdown("""<style> body, .stApp {background:#1a1a2e;color:#eee} .st-expander {background:#16213e;border-radius:12px;padding:8px;margin-bottom:8px;border:1px solid #0f3460} .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 4px 8px rgba(0,0,0,0.3)} .kupon-box {background:#2c3e50;border-radius:8px;padding:10px;margin:8px 0} </style>""", unsafe_allow_html=True)
 else:
     st.markdown("""<style> .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 2px 6px rgba(0,0,0,0.15)} .kupon-box {background:#ecf0f1;border-radius:8px;padding:10px;margin:8px 0} </style>""", unsafe_allow_html=True)
 
-# ---------- Veri Yükleme ----------
-@st.cache_resource
+# ---------- CANLI YARIŞ ÇEKME FONKSİYONU ----------
+def canli_yaris_cek():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": "https://www.tjk.org/TR/YarisSever/Info/Page/GunlukYarisProgrami"
+    }
+    bugun = datetime.datetime.now().strftime("%d/%m/%Y")
+    tarih_dosya = datetime.datetime.now().strftime("%Y%m%d")
+    csv_dosya = f"yarislar_{tarih_dosya}.csv"
+
+    TURKIYE_SEHIRLER = ["Ankara", "Izmir", "İzmir", "Bursa", "Diyarbakir", "Diyarbakır",
+                        "Istanbul", "İstanbul", "Adana", "Sanliurfa", "Şanlıurfa",
+                        "Elazig", "Elazığ", "Antalya", "Kocaeli"]
+
+    ana_url = "https://www.tjk.org/TR/YarisSever/Info/Page/GunlukYarisProgrami"
+    response = requests.get(ana_url, headers=headers, timeout=15)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    sehirler = []
+    gorulen = set()
+    for link in soup.find_all("a", href=True):
+        href = link.get("href", "")
+        if "SehirId=" in href:
+            try:
+                sehir_id = href.split("SehirId=")[1].split("&")[0]
+                if sehir_id in gorulen: continue
+                gorulen.add(sehir_id)
+                if "SehirAdi=" in href:
+                    raw = href.split("SehirAdi=")[1].split("&")[0]
+                    sehir_adi = unquote(raw.replace("+", " "))
+                else:
+                    sehir_adi = link.text.strip()
+                sehirler.append((sehir_id, sehir_adi))
+            except: pass
+    turkiye = [(sid, sad) for sid, sad in sehirler if any(t in sad for t in TURKIYE_SEHIRLER)]
+    if not turkiye: return False, csv_dosya
+
+    with open(csv_dosya, "w", encoding="utf-8-sig", newline="") as f:
+        yazici = csv.writer(f, delimiter=";")
+        yazici.writerow(["Hipodrom","Kosu_No","Saat","Mesafe","Pist","Cins","Sira","At_Ismi",
+                         "Yas_Cinsiyet","Orijin","Kilo","Jokey","Sahip","Antrenor","Start_No",
+                         "HP","Son_6_Yaris","KGS","S20","Ganyan","AGF","Tarih"])
+        for sehir_id, sehir_adi in turkiye:
+            sehir_adi_url = quote(sehir_adi.replace(" ", "+"), safe="+")
+            sehir_url = (f"https://www.tjk.org/TR/YarisSever/Info/Sehir/GunlukYarisProgrami"
+                         f"?SehirId={sehir_id}&QueryParameter_Tarih={bugun}&SehirAdi={sehir_adi_url}&Era=today")
+            try:
+                r = requests.get(sehir_url, headers=headers, timeout=20)
+                ssoup = BeautifulSoup(r.text, "html.parser")
+                kosu_saatleri = {}
+                for tab in ssoup.find_all("a", id=re.compile(r"^anc-?\d+")):
+                    tab_text = tab.get_text(" ", strip=True)
+                    match = re.search(r'(\d+)\.\s*Ko[şs]u\s+(\d{1,2}[:\.]\d{2})', tab_text)
+                    if match: kosu_saatleri[match.group(1)] = match.group(2).replace(".", ":")
+                kosu_tablolari = ssoup.find_all("div", id=re.compile(r"^kosubilgisi-"))
+                kosu_index = 0
+                for kosu_div in kosu_tablolari:
+                    kosu_index += 1
+                    parent = kosu_div.find_parent("div", id=re.compile(r"^-?\d+"))
+                    kosu_no = str(kosu_index)
+                    if parent:
+                        h3 = parent.find("h3", class_="race-no")
+                        if h3:
+                            no_match = re.search(r'(\d+)\.\s*Ko[şs]u', h3.get_text(" ", strip=True))
+                            if no_match: kosu_no = no_match.group(1)
+                    saat = kosu_saatleri.get(kosu_no, "")
+                    mesafe, pist, cins = "", "", ""
+                    if parent:
+                        config = parent.find("h3", class_="race-config")
+                        if config:
+                            ctext = config.get_text(" ", strip=True)
+                            m = re.search(r'\b(\d{3,4})\b', ctext)
+                            if m: mesafe = m.group(1)
+                            if "Çim" in ctext or "Cim" in ctext: pist = "Cim"
+                            elif "Kum" in ctext: pist = "Kum"
+                            for c in ["Maiden","Handikap","Şartlı","Sartli","Satış","Satis","KV","A1","A2","A3"]:
+                                if c in ctext: cins = c; break
+                    tablo = kosu_div.find("table", class_="tablesorter")
+                    if not tablo: continue
+                    tbody = tablo.find("tbody")
+                    if not tbody: continue
+                    for tr in tbody.find_all("tr"):
+                        try:
+                            td_sira = tr.find("td", class_="gunluk-GunlukYarisProgrami-SiraId")
+                            td_at = tr.find("td", class_="gunluk-GunlukYarisProgrami-AtAdi")
+                            if not td_at or not td_sira: continue
+                            sira = td_sira.get_text(strip=True)
+                            at_text = td_at.get_text(" ", strip=True)
+                            match_at = re.match(r"^([A-ZÇĞİÖŞÜ' ]+?)(?:\s+(?:KG|DB|KV|SK|SKG)|\s+\([^)]*\)|\s+[a-z]|$)", at_text)
+                            at_ismi = match_at.group(1).strip() if match_at else at_text.split()[0]
+                            if "(Koşmaz)" in at_text or "Kosmaz" in at_text: continue
+
+                            td_yas = tr.find("td", class_="gunluk-GunlukYarisProgrami-Yas")
+                            td_orijin = tr.find("td", class_="gunluk-GunlukYarisProgrami-Baba")
+                            td_kilo = tr.find("td", class_="gunluk-GunlukYarisProgrami-Kilo")
+                            td_jokey = tr.find("td", class_="gunluk-GunlukYarisProgrami-JokeAdi")
+                            td_sahip = tr.find("td", class_="gunluk-GunlukYarisProgrami-SahipAdi")
+                            td_antrenor = tr.find("td", class_="gunluk-GunlukYarisProgrami-AntronorAdi")
+                            td_start = tr.find("td", class_="gunluk-GunlukYarisProgrami-StartId")
+                            td_hp = tr.find("td", class_="gunluk-GunlukYarisProgrami-Hc")
+                            td_son6 = tr.find("td", class_="gunluk-GunlukYarisProgrami-Son6Yaris")
+                            td_kgs = tr.find("td", class_="gunluk-GunlukYarisProgrami-KGS")
+                            td_s20 = tr.find("td", class_="gunluk-GunlukYarisProgrami-s20")
+                            td_gny = tr.find("td", class_="gunluk-GunlukYarisProgrami-Gny")
+                            td_agf = tr.find("td", class_="gunluk-GunlukYarisProgrami-AGFORAN")
+
+                            yas = td_yas.get_text(strip=True) if td_yas else ""
+                            orijin = td_orijin.get_text(strip=True) if td_orijin else ""
+                            kilo = td_kilo.get_text(strip=True) if td_kilo else ""
+                            jokey = td_jokey.find("a").get_text(strip=True) if td_jokey and td_jokey.find("a") else (td_jokey.get_text(strip=True) if td_jokey else "")
+                            sahip = td_sahip.get_text(strip=True) if td_sahip else ""
+                            antrenor = td_antrenor.get_text(strip=True) if td_antrenor else ""
+                            start_no = td_start.get_text(strip=True) if td_start else ""
+                            hp = td_hp.get_text(strip=True) if td_hp else ""
+                            son6 = td_son6.get_text(strip=True) if td_son6 else ""
+                            kgs = td_kgs.get_text(strip=True) if td_kgs else ""
+                            s20 = td_s20.get_text(strip=True) if td_s20 else ""
+                            ganyan = ""
+                            if td_gny:
+                                g_text = td_gny.get_text(strip=True)
+                                g_match = re.search(r'(\d+[,.]?\d*)', g_text)
+                                if g_match: ganyan = g_match.group(1)
+                            agf = ""
+                            if td_agf:
+                                agf_text = td_agf.get_text(strip=True)
+                                agf_match = re.search(r'%(\d+(?:[,.]\d+)?)', agf_text)
+                                if agf_match: agf = "%" + agf_match.group(1)
+
+                            yazici.writerow([sehir_adi, kosu_no, saat, mesafe, pist, cins,
+                                             sira, at_ismi, yas, orijin, kilo,
+                                             jokey, sahip, antrenor, start_no, hp,
+                                             son6, kgs, s20, ganyan, agf, bugun])
+                        except: pass
+            except: pass
+    return True, csv_dosya
+
+# ---------- ÖNBELENEBİLİR VERİ YÜKLEME ----------
+@st.cache_resource(ttl=3600)
 def load_data():
     jokey_db, antrenor_db, at_db = {}, {}, {}
     for file, db, key in [("jokey_istatistik.csv", jokey_db, "Jokey"),
@@ -130,21 +269,36 @@ def form_detay(at):
     varyans = np.var(son6) if len(son6) >= 2 else 0
     return puan, ort, trend, varyans
 
-# ---------- Arayüz ----------
-st.title("🐎 TJK Tahmin Pro v11 – Temiz Strateji Paneli")
-st.caption("Sadece ilk 3 tahmin • akıllı kupon stratejileri • güven skoru")
+# ---------- ARAYÜZ ----------
+st.title("🐎 TJK Tahmin Pro v12")
+st.caption("Canlı Yarış Çekme | Akıllı Kupon | Güven Skoru")
 
-if os.path.exists("gecmis_sonuclar.csv"):
-    mod_time = os.path.getmtime("gecmis_sonuclar.csv")
-    son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
-    st.info(f"📅 Son güncelleme: {son_tarih}")
+# Cache temizleme butonu
 if st.sidebar.button("🗑️ Cache Temizle & Yenile"):
     st.cache_resource.clear()
     st.cache_data.clear()
     st.success("✅ Cache temizlendi, sayfa yenileniyor...")
     st.rerun()
+
+# Canlı yarış çekme butonu
+if st.sidebar.button("🔄 Yarışları Canlı Çek"):
+    with st.spinner("⏳ TJK'dan güncel yarışlar alınıyor..."):
+        basarili, dosya = canli_yaris_cek()
+        if basarili:
+            st.success(f"✅ {dosya} oluşturuldu! Sayfa yenileniyor...")
+            st.cache_resource.clear()
+            st.cache_data.clear()
+            st.rerun()
+        else:
+            st.warning("⚠️ Bugün yarış bulunamadı veya bağlantı hatası. Lütfen daha sonra tekrar deneyin.")
+
+if os.path.exists("gecmis_sonuclar.csv"):
+    mod_time = os.path.getmtime("gecmis_sonuclar.csv")
+    son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
+    st.info(f"📅 Son güncelleme: {son_tarih}")
+
 if df.empty:
-    st.warning("Henüz yarış verisi yok.")
+    st.warning("Henüz yarış verisi yok. Lütfen 'Yarışları Canlı Çek' butonuna basın.")
     st.stop()
 
 use_ml = st.checkbox("🤖 ML Destekli Hibrit Tahmin", value=True)
@@ -232,7 +386,6 @@ for k_no in kosular:
             fark1 = puanlar[0]["Puan"] - puanlar[1]["Puan"]
             fark2 = puanlar[1]["Puan"] - puanlar[2]["Puan"]
 
-            # Güven skoru
             guven_skoru = min(100, max(20, 100 - (fark2 * 5)))
             if fark1 > 25: guven_skoru = 90
             elif fark1 > 15: guven_skoru = 75
@@ -248,10 +401,7 @@ for k_no in kosular:
                 stratejiler.append(f"⚖️ **Dengeli Yarış:** İlk 3 at birbirine yakın")
                 stratejiler.append(f"💡 Tavsiye: Üçlü veya 4 atla geniş kupon")
 
-            # Ganyan bilgisi
             stratejiler.append(f"📊 En düşük ganyan: {puanlar[0]['Ganyan']}")
-
-            # Güven skoru
             stratejiler.append(f"🛡️ Güven Skoru: %{guven_skoru}")
 
             with st.container():
