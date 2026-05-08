@@ -8,7 +8,7 @@ from urllib.parse import unquote, quote
 import warnings
 warnings.filterwarnings('ignore')
 
-st.set_page_config(page_title="TJK Pro v12", page_icon="🐎", layout="wide")
+st.set_page_config(page_title="TJK Pro Final", page_icon="🐎", layout="wide")
 
 # ---------- Karanlık mod ----------
 if "dark" not in st.session_state: st.session_state.dark = False
@@ -16,7 +16,7 @@ if "auth" not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
     with st.form("login"):
-        st.title("🐎 TJK Pro v12")
+        st.title("🐎 TJK Pro Final")
         pwd = st.text_input("Şifre", type="password")
         if st.form_submit_button("Giriş"):
             if pwd == "barisbaba2026":
@@ -26,16 +26,56 @@ if not st.session_state.auth:
                 st.error("Yanlış şifre!")
     st.stop()
 
-c1, c2 = st.columns([1, 10])
-with c1:
-    if st.button("🌙" if not st.session_state.dark else "☀️"):
+# ---------- SİDEBAR ----------
+with st.sidebar:
+    st.markdown("### ⚙️ Kontroller")
+    if st.button("🌙 Karanlık Mod" if not st.session_state.dark else "☀️ Aydınlık Mod"):
         st.session_state.dark = not st.session_state.dark
+        st.rerun()
+    
+    st.markdown("---")
+    use_ml = st.checkbox("🤖 ML Destekli Hibrit Tahmin", value=True)
+    
+    st.markdown("---")
+    if st.button("🔄 Yarışları Canlı Çek"):
+        with st.spinner("⏳ TJK'dan güncel yarışlar alınıyor..."):
+            basarili, dosya = canli_yaris_cek()
+            if basarili:
+                st.success(f"✅ {dosya} oluşturuldu! Sayfa yenileniyor...")
+                st.cache_resource.clear()
+                st.cache_data.clear()
+                st.rerun()
+            else:
+                st.warning("⚠️ Bugün yarış bulunamadı veya bağlantı hatası.")
+    
+    if st.button("🗑️ Cache Temizle & Yenile"):
+        st.cache_resource.clear()
+        st.cache_data.clear()
+        st.success("✅ Cache temizlendi, sayfa yenileniyor...")
+        st.rerun()
+    
+    st.markdown("---")
+    if os.path.exists("gecmis_sonuclar.csv"):
+        mod_time = os.path.getmtime("gecmis_sonuclar.csv")
+        son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
+        st.caption(f"📅 Son güncelleme: {son_tarih}")
+    
+    st.markdown("---")
+    st.caption("👨‍👦 Aile içi kullanım")
 
-# CSS
+# ---------- CSS ----------
 if st.session_state.dark:
-    st.markdown("""<style> body, .stApp {background:#1a1a2e;color:#eee} .st-expander {background:#16213e;border-radius:12px;padding:8px;margin-bottom:8px;border:1px solid #0f3460} .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 4px 8px rgba(0,0,0,0.3)} .kupon-box {background:#2c3e50;border-radius:8px;padding:10px;margin:8px 0} </style>""", unsafe_allow_html=True)
+    st.markdown("""<style>
+    body, .stApp {background:#1a1a2e;color:#eee}
+    .st-expander {background:#16213e;border-radius:12px;padding:8px;margin-bottom:8px;border:1px solid #0f3460}
+    .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 4px 8px rgba(0,0,0,0.3)}
+    .kupon-box {background:#2c3e50;border-radius:8px;padding:10px;margin:8px 0}
+    </style>""", unsafe_allow_html=True)
 else:
-    st.markdown("""<style> .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 2px 6px rgba(0,0,0,0.15)} .kupon-box {background:#ecf0f1;border-radius:8px;padding:10px;margin:8px 0} </style>""", unsafe_allow_html=True)
+    st.markdown("""<style>
+    .top-card {padding:12px;border-radius:12px;color:white;margin:4px 0;box-shadow:0 2px 6px rgba(0,0,0,0.15)}
+    .kupon-box {background:#f8f9fa;border-radius:8px;padding:10px;margin:8px 0;border:1px solid #dee2e6}
+    </style>""", unsafe_allow_html=True)
 
 # ---------- CANLI YARIŞ ÇEKME FONKSİYONU ----------
 def canli_yaris_cek():
@@ -174,7 +214,7 @@ def canli_yaris_cek():
             except: pass
     return True, csv_dosya
 
-# ---------- ÖNBELENEBİLİR VERİ YÜKLEME ----------
+# ---------- VERİ YÜKLEME ----------
 @st.cache_resource(ttl=3600)
 def load_data():
     jokey_db, antrenor_db, at_db = {}, {}, {}
@@ -269,39 +309,14 @@ def form_detay(at):
     varyans = np.var(son6) if len(son6) >= 2 else 0
     return puan, ort, trend, varyans
 
-# ---------- ARAYÜZ ----------
-st.title("🐎 TJK Tahmin Pro v12")
-st.caption("Canlı Yarış Çekme | Akıllı Kupon | Güven Skoru")
-
-# Cache temizleme butonu
-if st.sidebar.button("🗑️ Cache Temizle & Yenile"):
-    st.cache_resource.clear()
-    st.cache_data.clear()
-    st.success("✅ Cache temizlendi, sayfa yenileniyor...")
-    st.rerun()
-
-# Canlı yarış çekme butonu
-if st.sidebar.button("🔄 Yarışları Canlı Çek"):
-    with st.spinner("⏳ TJK'dan güncel yarışlar alınıyor..."):
-        basarili, dosya = canli_yaris_cek()
-        if basarili:
-            st.success(f"✅ {dosya} oluşturuldu! Sayfa yenileniyor...")
-            st.cache_resource.clear()
-            st.cache_data.clear()
-            st.rerun()
-        else:
-            st.warning("⚠️ Bugün yarış bulunamadı veya bağlantı hatası. Lütfen daha sonra tekrar deneyin.")
-
-if os.path.exists("gecmis_sonuclar.csv"):
-    mod_time = os.path.getmtime("gecmis_sonuclar.csv")
-    son_tarih = datetime.datetime.fromtimestamp(mod_time).strftime("%d.%m.%Y %H:%M")
-    st.info(f"📅 Son güncelleme: {son_tarih}")
+# ---------- ANA EKRAN ----------
+st.title("🐎 TJK Tahmin Pro")
+st.caption("Kural Tabanlı + ML Hibrit | Akıllı Kupon | Güven Skoru")
 
 if df.empty:
-    st.warning("Henüz yarış verisi yok. Lütfen 'Yarışları Canlı Çek' butonuna basın.")
+    st.warning("Henüz yarış verisi yok. Lütfen sol menüden 'Yarışları Canlı Çek' butonuna basın.")
     st.stop()
 
-use_ml = st.checkbox("🤖 ML Destekli Hibrit Tahmin", value=True)
 hipodrom = st.radio("🏟️ Hipodrom", sorted(df["Hipodrom"].unique()), horizontal=True)
 kosular = sorted(df[df["Hipodrom"] == hipodrom]["Kosu_No"].unique(), key=lambda x: int(x) if str(x).isdigit() else 99)
 
